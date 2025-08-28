@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: financial-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: financial_reporting
+      MYSQL_USER: rogerbap
+      MYSQL_PASSWORD: Gaelle19!
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - financial_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: financial-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: secret
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - financial_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: financial-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - financial_network
+
+networks:
+  financial_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
