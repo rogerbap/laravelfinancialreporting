@@ -8,8 +8,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: secret
       MYSQL_DATABASE: financial_reporting
-      MYSQL_USER: rogerbap
-      MYSQL_PASSWORD: Gaelle19!
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: secret
     ports:
       - "3306:3306"
     volumes:
