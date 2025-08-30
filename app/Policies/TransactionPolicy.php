@@ -1,139 +1,59 @@
 <?php
-// app/Http/Controllers/Api/TransactionApiController.php
+// app/Policies/TransactionPolicy.php
 
-namespace App\Http\Controllers\Api;
+namespace App\Policies;
 
-use App\Http\Controllers\Controller;
-use App\Models\Transaction;
-use App\Http\Resources\{TransactionResource, TransactionCollection};
-use App\Http\Requests\{StoreTransactionRequest, UpdateTransactionRequest};
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use App\Models\{User, Transaction};
+use Illuminate\Auth\Access\HandlesAuthorization;
 
-class TransactionApiController extends Controller
+class TransactionPolicy
 {
-    public function __construct()
+    use HandlesAuthorization;
+
+    public function viewAny(User $user): bool
     {
-        $this->middleware('auth:sanctum');
+        return $user->hasPermissionTo('view transactions');
     }
 
-    public function index(Request $request): TransactionCollection
+    public function view(User $user, Transaction $transaction): bool
     {
-        $query = Transaction::with(['category', 'creator'])
-            ->latest();
-
-        // Apply filters
-        if ($request->filled('category_id')) {
-            $query->byCategory($request->category_id);
-        }
-
-        if ($request->filled('type')) {
-            $query->byType($request->type);
-        }
-
-        if ($request->filled('status')) {
-            $query->byStatus($request->status);
-        }
-
-        if ($request->filled('date_from') && $request->filled('date_to')) {
-            $query->byDateRange($request->date_from, $request->date_to);
-        }
-
-        $transactions = $query->paginate($request->get('per_page', 15));
-
-        return new TransactionCollection($transactions);
+        return $user->hasPermissionTo('view transactions') || 
+               $user->id === $transaction->created_by;
     }
 
-    public function show(Transaction $transaction): TransactionResource
+    public function create(User $user): bool
     {
-        $this->authorize('view', $transaction);
-        
-        return new TransactionResource(
-            $transaction->load(['category', 'creator', 'approver', 'report'])
-        );
+        return $user->hasPermissionTo('create transactions');
     }
 
-    public function store(StoreTransactionRequest $request): JsonResponse
+    public function update(User $user, Transaction $transaction): bool
     {
-        $this->authorize('create', Transaction::class);
-
-        $data = $request->validated();
-        $data['created_by'] = auth()->id();
-
-        $transaction = Transaction::create($data);
-        $transaction->load(['category', 'creator']);
-
-        return response()->json([
-            'message' => 'Transaction created successfully',
-            'data' => new TransactionResource($transaction)
-        ], 201);
+        // Can edit own transactions if pending, or has edit permission
+        return ($user->id === $transaction->created_by && $transaction->isPending()) ||
+               $user->hasPermissionTo('edit transactions');
     }
 
-    public function update(UpdateTransactionRequest $request, Transaction $transaction): JsonResponse
+    public function delete(User $user, Transaction $transaction): bool
     {
-        $this->authorize('update', $transaction);
-
-        $transaction->update($request->validated());
-        $transaction->load(['category', 'creator', 'approver']);
-
-        return response()->json([
-            'message' => 'Transaction updated successfully',
-            'data' => new TransactionResource($transaction)
-        ]);
+        // Can delete own transactions if pending, or has delete permission
+        return ($user->id === $transaction->created_by && $transaction->isPending()) ||
+               $user->hasPermissionTo('delete transactions');
     }
 
-    public function destroy(Transaction $transaction): JsonResponse
+    public function approve(User $user, Transaction $transaction): bool
     {
-        $this->authorize('delete', $transaction);
-
-        $transaction->delete();
-
-        return response()->json([
-            'message' => 'Transaction deleted successfully'
-        ]);
+        // Cannot approve own transactions
+        return $user->hasPermissionTo('approve transactions') && 
+               $user->id !== $transaction->created_by;
     }
 
-    public function approve(Transaction $transaction): JsonResponse
+    public function import(User $user): bool
     {
-        $this->authorize('approve', $transaction);
-
-        $transaction->update([
-            'status' => 'approved',
-            'approved_by' => auth()->id(),
-            'approved_at' => now(),
-        ]);
-
-        return response()->json([
-            'message' => 'Transaction approved successfully',
-            'data' => new TransactionResource($transaction->fresh(['category', 'creator', 'approver']))
-        ]);
+        return $user->hasPermissionTo('import transactions');
     }
 
-    public function analytics(Request $request): JsonResponse
+    public function export(User $user): bool
     {
-        $dateFrom = $request->get('date_from', now()->startOfMonth());
-        $dateTo = $request->get('date_to', now()->endOfMonth());
-
-        $transactions = Transaction::byDateRange($dateFrom, $dateTo);
-
-        $analytics = [
-            'summary' => [
-                'total_income' => $transactions->byType('income')->sum('amount'),
-                'total_expenses' => $transactions->byType('expense')->sum('amount'),
-                'transaction_count' => $transactions->count(),
-            ],
-            'by_category' => $transactions->with('category')
-                ->get()
-                ->groupBy('category.name')
-                ->map->sum('amount'),
-            'by_type' => $transactions->get()
-                ->groupBy('type')
-                ->map->sum('amount'),
-            'by_status' => $transactions->get()
-                ->groupBy('status')
-                ->map->count(),
-        ];
-
-        return response()->json($analytics);
+        return $user->hasPermissionTo('export transactions');
     }
 }

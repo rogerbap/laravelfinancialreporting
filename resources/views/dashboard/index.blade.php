@@ -248,7 +248,7 @@ new Chart(categoryCtx, {
             tooltip: {
                 callbacks: {
                     label: function(context) {
-                        return context.label + ':  + context.parsed.toLocaleString();
+                       return context.label + ': $' + context.parsed.toLocaleString();
                     }
                 }
             }
@@ -290,7 +290,7 @@ new Chart(trendsCtx, {
                 beginAtZero: true,
                 ticks: {
                     callback: function(value) {
-                        return ' + value.toLocaleString();
+                        return '$' + value.toLocaleString();
                     }
                 }
             }

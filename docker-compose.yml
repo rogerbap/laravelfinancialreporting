@@ -1,49 +1,61 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: financial-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./storage:/var/www/storage
+    networks:
+      - financial-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: financial-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx:/etc/nginx/conf.d
+    networks:
+      - financial-network
+
   mysql:
     image: mysql:8.0
     container_name: financial-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: secret
       MYSQL_DATABASE: financial_reporting
-      MYSQL_USER: laravel
+      MYSQL_ROOT_PASSWORD: secret
       MYSQL_PASSWORD: secret
+      MYSQL_USER: laravel
+    volumes:
+      - mysql-data:/var/lib/mysql
     ports:
       - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
     networks:
-      - financial_network
-
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: financial-phpmyadmin
-    restart: unless-stopped
-    environment:
-      PMA_HOST: mysql
-      PMA_USER: root
-      PMA_PASSWORD: secret
-    ports:
-      - "8080:80"
-    depends_on:
-      - mysql
-    networks:
-      - financial_network
+      - financial-network
 
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
     container_name: financial-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
-      - financial_network
+      - financial-network
 
 networks:
-  financial_network:
+  financial-network:
     driver: bridge
 
 volumes:
-  mysql_data:
+  mysql-data:
